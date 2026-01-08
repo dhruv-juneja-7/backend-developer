@@ -48,7 +48,7 @@ User
 ↓  
 **UI changes**
 
-## Pyantic
+## Pydantic
 
 It not only checks the input data but it parses it and convert it to the right data type. It converts untrusted input to trusted, well-typed python objects.
 
@@ -403,3 +403,4 @@ The system that sends data or requests to you
 👉 Downstream
 
 The system that receives data or requests from you
+
