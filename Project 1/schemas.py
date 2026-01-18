@@ -7,15 +7,18 @@ class UserResponse(BaseModel):
     email: EmailStr
     role: str
 
+    class Config:
+        from_attributes = True 
+
+
 class UserCreate(BaseModel):
     name: str = Field(..., min_length=3)
     email: EmailStr
 
-class ActionCreate(BaseModel):
-    user_id: int 
-    status: str
-
 class ActionResponse(BaseModel):
     id: int
     status: str
+
+    class Config:
+        from_attributes = True
 
