@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
-from schemas import UserResponse, UserCreate, ActionCreate, ActionResponse
+from schemas import UserResponse, UserCreate, ActionResponse
 from deps import get_db
 from models import User, IdempotencyKey, Action
 from sqlalchemy.orm import Session
@@ -56,35 +56,40 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
 #     return {"message": "User has been deleted"}
 
-@app.post("/actions/{user_id}/{idem_key}")
+@app.post("/actions/{user_id}/{idem_key}", response_model=ActionResponse)
 def create_action(user_id: int, idem_key: str, db: Session = Depends(get_db)) -> ActionResponse:
-    db_idem_key = db.query(IdempotencyKey).filter((IdempotencyKey.key == idem_key) & (IdempotencyKey.user_id==user_id)).first()
+    user = db.query(User).filter(User.id == user_id).first()
 
-    if db_idem_key:
-        action_id = db_idem_key.action_id
-        db_action = db.query(Action).filter(Action.id == action_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
 
-        return ActionResponse(id=db_action.id, status=db_action.status)
+    existing_key = db.query(IdempotencyKey).filter(IdempotencyKey.key == idem_key, IdempotencyKey.user_id==user_id).first()
+
+    if existing_key:
+        action_id = existing_key.action_id
+        action = db.query(Action).filter(Action.id == action_id).first()
+
+        return action
 
 
-    db_action = Action(user_id=user_id, status="Pending")
+    action = Action(user_id=user_id, status="Pending")
 
-    db.add(db_action)
-
+    db.add(action)
     db.flush()
 
-    db_idem_key = IdempotencyKey(key = idem_key, action_id=db_action.id, user_id=user_id)
-    db.add(db_idem_key)
+    idem = IdempotencyKey(key = idem_key, action_id=action.id, user_id=user_id)
+    db.add(idem)
 
     try:
         db.commit()
-    except:
+    except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Action cannot be completed.")
+        existing_key = db.query(IdempotencyKey).filter(IdempotencyKey.key == idem_key, IdempotencyKey.user_id==user_id).first()
+        action = db.query(Action).filter(Action.id == existing_key.action_id).first()
+        return action
 
-    db.refresh(db_action)
-    db.refresh(db_idem_key)
+    db.refresh(action)
     
-    return ActionResponse(id=db_action.id, status=db_action.status)
+    return action
 
     
