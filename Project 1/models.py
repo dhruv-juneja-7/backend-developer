@@ -1,5 +1,5 @@
 from database import Base 
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -12,7 +12,7 @@ class User(Base):
     name = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, nullable= False, index=True)
     role = Column(String(50), default="user", server_default="user")
-
+    
     actions = relationship("Action", back_populates="users", cascade="all, delete-orphan")
 
 
@@ -23,6 +23,21 @@ class Action(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     status = Column(String(50), nullable=False)
-    created_at = Column(DateTime, nullable=False, default=func.now(), server_default=func.now())
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
 
     users = relationship("User", back_populates="actions")
+
+
+class IdempotencyKey(Base):
+
+    __tablename__ = "idempotency_key"
+
+    id = Column(Integer, nullable=False, primary_key=True)
+    key = Column(String(255), nullable=False, unique=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    action_id = Column(Integer, ForeignKey("actions.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime,nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("key","user_id", name="uq_idempotency_key_user")
+    )
